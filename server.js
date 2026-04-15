@@ -62,10 +62,10 @@ function videoToGif(videoPath, gifPath) {
   });
 }
 
-// Clean up old temp GIFs on startup
+// Ensure temp dir exists and clean up old GIFs on startup
 function cleanTempGifs() {
   const tempDir = path.join(__dirname, 'public', 'temp');
-  if (!fs.existsSync(tempDir)) return;
+  fs.mkdirSync(tempDir, { recursive: true });
   const files = fs.readdirSync(tempDir);
   files.forEach(f => {
     try { fs.unlinkSync(path.join(tempDir, f)); } catch {}
