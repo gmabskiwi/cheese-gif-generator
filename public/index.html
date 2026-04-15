@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cheese GIF Generator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+
+    <header class="header">
+      <div class="header-inner">
+        <div class="logo">
+          <img src="/assets/cheese.png" alt="Cheese" class="logo-img" id="logoImg" onerror="this.style.display='none'" />
+          <div class="logo-text">
+            <span class="logo-name">Cheese</span>
+            <span class="logo-sub">GIF Generator</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="main">
+      <div class="card">
+
+        <div class="prompt-section">
+          <label class="label" for="promptInput">What should Cheese do?</label>
+          <div class="input-row">
+            <input
+              type="text"
+              id="promptInput"
+              class="input"
+              placeholder="jumping, waving, eating cheese, running..."
+              maxlength="200"
+              autocomplete="off"
+            />
+            <button id="generateBtn" class="btn-generate">
+              <span class="btn-text">Generate</span>
+              <span class="btn-icon">→</span>
+            </button>
+          </div>
+          <div class="suggestions">
+            <span class="suggestion-label">Try:</span>
+            <button class="pill" data-prompt="jumping excitedly">jumping excitedly</button>
+            <button class="pill" data-prompt="waving hello">waving hello</button>
+            <button class="pill" data-prompt="running fast">running fast</button>
+            <button class="pill" data-prompt="doing a happy dance">happy dance</button>
+            <button class="pill" data-prompt="eating a piece of cheese">eating cheese</button>
+          </div>
+        </div>
+
+        <div class="status-section hidden" id="statusSection">
+          <div class="loader">
+            <div class="loader-ring"></div>
+            <div class="loader-ring"></div>
+            <div class="loader-ring"></div>
+          </div>
+          <p class="status-text" id="statusText">Starting...</p>
+          <p class="status-hint">This takes ~30–60 seconds</p>
+        </div>
+
+        <div class="result-section hidden" id="resultSection">
+          <div class="gif-wrapper">
+            <img id="gifResult" alt="Generated GIF" class="gif-output" />
+          </div>
+          <div class="result-actions">
+            <a id="downloadBtn" class="btn-download" download>Download GIF</a>
+            <button id="newBtn" class="btn-new">Make Another</button>
+          </div>
+        </div>
+
+        <div class="error-section hidden" id="errorSection">
+          <p class="error-icon">⚠</p>
+          <p class="error-text" id="errorText">Something went wrong.</p>
+          <button id="retryBtn" class="btn-retry">Try Again</button>
+        </div>
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <span>Web3 Playboys · Artist: Sloppy · Powered by Kling AI</span>
+    </footer>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

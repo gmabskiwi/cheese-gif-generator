@@ -1,0 +1,6 @@
+{
+  "lora_url": "https://v3b.fal.media/files/b/0a94d22c/t03Fo_BItFZ6OOlJ2SdXV_pytorch_lora_weights.safetensors",
+  "trigger_word": "CHEESECHAR",
+  "trained_at": "2026-04-03T21:48:54.488Z",
+  "training_images": 13
+}
