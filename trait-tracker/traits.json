@@ -6,9 +6,9 @@
       "name": "Tiger Claw",
       "reference": null,
       "variants": [
-        { "gender": "Female", "skin": "White", "done": false, "image": null },
-        { "gender": "Female", "skin": "Tanned", "done": false, "image": null },
-        { "gender": "Female", "skin": "Brown", "done": false, "image": null }
+        { "gender": "Female", "skin": "White", "sent": false, "uploaded": false, "image": null },
+        { "gender": "Female", "skin": "Tanned", "sent": false, "uploaded": false, "image": null },
+        { "gender": "Female", "skin": "Brown", "sent": false, "uploaded": false, "image": null }
       ]
     }
   ]

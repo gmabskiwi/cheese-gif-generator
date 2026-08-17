@@ -42,32 +42,35 @@ def render():
 
     traits = state["traits"]
     all_variants = [v for t in traits for v in t["variants"]]
-    done = sum(1 for v in all_variants if v["done"])
+    uploaded = sum(1 for v in all_variants if v["uploaded"])
+    sent = sum(1 for v in all_variants if v["sent"])
     total = len(all_variants)
-    pct = round(100 * done / total) if total else 0
+    pct = round(100 * uploaded / total) if total else 0
 
     skin_tones = {"White": "#F3D8C2", "Tanned": "#D9A468", "Brown": "#8D5B35"}
 
     cards = []
     for t in traits:
-        t_done = sum(1 for v in t["variants"] if v["done"])
+        t_uploaded = sum(1 for v in t["variants"] if v["uploaded"])
         t_total = len(t["variants"])
         tiles = []
         for v in t["variants"]:
             alt = f'{esc(v["gender"])} {esc(v["skin"])}'
-            if v.get("image"):
+            if v["uploaded"] and v.get("image"):
                 art = f'<div class="art"><img src="{image_data_uri(v["image"])}" alt="{alt}"></div>'
+            elif v["uploaded"]:
+                art = '<div class="art"><span>uploaded</span></div>'
             else:
-                art = '<div class="art empty"><span>awaiting art</span></div>'
-            cls = "tile done" if v["done"] else "tile"
-            chip = ('<span class="chip ok">DONE</span>' if v["done"]
-                    else '<span class="chip todo">NEEDED</span>')
+                art = ''
+            cls = "tile done" if v["uploaded"] else "tile"
+            sent_check = '<span class="check sent" data-status="sent">✓ sent</span>' if v["sent"] else '<span class="check todo" data-status="sent">sent</span>'
+            uploaded_check = '<span class="check ok" data-status="uploaded">✓ uploaded</span>' if v["uploaded"] else '<span class="check todo" data-status="uploaded">uploaded</span>'
             tone = skin_tones.get(v["skin"], "#999999")
             tiles.append(
                 f'<div class="{cls}">'
                 f'<div class="badges"><span class="badge gender">{esc(v["gender"])}</span>'
-                f'<span class="badge skin"><i style="background:{tone}"></i>{esc(v["skin"])}</span>'
-                f'{chip}</div>'
+                f'<span class="badge skin"><i style="background:{tone}"></i>{esc(v["skin"])}</span></div>'
+                f'<div class="checks">{sent_check}{uploaded_check}</div>'
                 f'{art}</div>')
         if t.get("reference"):
             ref = (f'<figure class="ref"><figcaption>Reference</figcaption>'
@@ -76,7 +79,7 @@ def render():
         else:
             ref = ('<figure class="ref empty"><figcaption>Reference</figcaption>'
                    '<div class="ref-slot"><span>no reference art yet</span></div></figure>')
-        complete = ' complete' if t_done == t_total else ''
+        complete = ' complete' if t_uploaded == t_total else ''
         cards.append(f'''
     <section class="card{complete}">
       <header class="card-head">
@@ -84,7 +87,7 @@ def render():
           <span class="cat">{esc(t["category"])}</span>
           <h2>{esc(t["name"])}</h2>
         </div>
-        <span class="count">{t_done}<em>/</em>{t_total}</span>
+        <span class="count">{t_uploaded}<em>/</em>{t_total}</span>
       </header>
       <div class="card-body">
         {ref}
@@ -191,6 +194,14 @@ def render():
   }}
   .tile.done {{ border-color: color-mix(in srgb, var(--ok) 55%, var(--line)); }}
   .badges {{ display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }}
+  .checks {{ display: flex; gap: 8px; }}
+  .check {{
+    font: 800 9px/1 var(--mono); letter-spacing: .12em; border-radius: 3px;
+    padding: 4px 6px; flex: none; cursor: pointer;
+  }}
+  .check.ok {{ background: var(--ok); color: var(--ink); }}
+  .check.sent {{ background: color-mix(in srgb, var(--amber) 35%, transparent); color: var(--amber); }}
+  .check.todo {{ background: color-mix(in srgb, var(--todo) 18%, transparent); color: var(--todo); }}
   .badge {{
     font: 800 10px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
     border-radius: 4px; padding: 5px 7px;
@@ -237,8 +248,8 @@ def render():
   light up green — anything marked <strong>needed</strong> is open work.</p>
 
   <div class="stats">
-    <div class="stat done"><b>{done}</b><span>Done</span></div>
-    <div class="stat todo"><b>{total - done}</b><span>Needed</span></div>
+    <div class="stat done"><b>{uploaded}</b><span>Uploaded</span></div>
+    <div class="stat todo"><b>{sent - uploaded}</b><span>Pending</span></div>
     <div class="stat"><b>{total}</b><span>Total</span></div>
     <div class="stat pct"><b>{pct}%</b><span>Complete</span></div>
     <div class="stat bar">
@@ -253,7 +264,7 @@ def render():
 '''
     with open(OUT, "w") as fh:
         fh.write(html)
-    print(f"dashboard.html written — {done}/{total} done ({pct}%)")
+    print(f"dashboard.html written — {uploaded}/{total} uploaded ({pct}%)")
 
 
 if __name__ == "__main__":

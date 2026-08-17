@@ -97,6 +97,14 @@
   }
   .tile.done { border-color: color-mix(in srgb, var(--ok) 55%, var(--line)); }
   .badges { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+  .checks { display: flex; gap: 8px; }
+  .check {
+    font: 800 9px/1 var(--mono); letter-spacing: .12em; border-radius: 3px;
+    padding: 4px 6px; flex: none; cursor: pointer;
+  }
+  .check.ok { background: var(--ok); color: var(--ink); }
+  .check.sent { background: color-mix(in srgb, var(--amber) 35%, transparent); color: var(--amber); }
+  .check.todo { background: color-mix(in srgb, var(--todo) 18%, transparent); color: var(--todo); }
   .badge {
     font: 800 10px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
     border-radius: 4px; padding: 5px 7px;
@@ -143,8 +151,8 @@
   light up green — anything marked <strong>needed</strong> is open work.</p>
 
   <div class="stats">
-    <div class="stat done"><b>0</b><span>Done</span></div>
-    <div class="stat todo"><b>3</b><span>Needed</span></div>
+    <div class="stat done"><b>0</b><span>Uploaded</span></div>
+    <div class="stat todo"><b>0</b><span>Pending</span></div>
     <div class="stat"><b>3</b><span>Total</span></div>
     <div class="stat pct"><b>0%</b><span>Complete</span></div>
     <div class="stat bar">
@@ -163,7 +171,7 @@
       </header>
       <div class="card-body">
         <figure class="ref empty"><figcaption>Reference</figcaption><div class="ref-slot"><span>no reference art yet</span></div></figure>
-        <div class="tiles"><div class="tile"><div class="badges"><span class="badge gender">Female</span><span class="badge skin"><i style="background:#F3D8C2"></i>White</span><span class="chip todo">NEEDED</span></div><div class="art empty"><span>awaiting art</span></div></div><div class="tile"><div class="badges"><span class="badge gender">Female</span><span class="badge skin"><i style="background:#D9A468"></i>Tanned</span><span class="chip todo">NEEDED</span></div><div class="art empty"><span>awaiting art</span></div></div><div class="tile"><div class="badges"><span class="badge gender">Female</span><span class="badge skin"><i style="background:#8D5B35"></i>Brown</span><span class="chip todo">NEEDED</span></div><div class="art empty"><span>awaiting art</span></div></div></div>
+        <div class="tiles"><div class="tile"><div class="badges"><span class="badge gender">Female</span><span class="badge skin"><i style="background:#F3D8C2"></i>White</span></div><div class="checks"><span class="check todo" data-status="sent">sent</span><span class="check todo" data-status="uploaded">uploaded</span></div></div><div class="tile"><div class="badges"><span class="badge gender">Female</span><span class="badge skin"><i style="background:#D9A468"></i>Tanned</span></div><div class="checks"><span class="check todo" data-status="sent">sent</span><span class="check todo" data-status="uploaded">uploaded</span></div></div><div class="tile"><div class="badges"><span class="badge gender">Female</span><span class="badge skin"><i style="background:#8D5B35"></i>Brown</span></div><div class="checks"><span class="check todo" data-status="sent">sent</span><span class="check todo" data-status="uploaded">uploaded</span></div></div></div>
       </div>
     </section>
   <footer>Updated 2026-08-17 · to add traits or check work off, drop it in
