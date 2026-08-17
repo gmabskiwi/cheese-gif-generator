@@ -491,7 +491,7 @@
       var ctx = c.getContext("2d");
       ctx.drawImage(img, 0, 0);
       var box = alphaBBox(ctx, c.width, c.height) || { x: 0, y: 0, w: c.width, h: c.height };
-      var scale = Math.min(1, 420 / Math.max(box.w, box.h));
+      var scale = Math.min(1, 340 / Math.max(box.w, box.h));
       var out = document.createElement("canvas");
       out.width = Math.max(1, Math.round(box.w * scale));
       out.height = Math.max(1, Math.round(box.h * scale));
