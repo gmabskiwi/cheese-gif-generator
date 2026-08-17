@@ -46,25 +46,36 @@ def render():
     total = len(all_variants)
     pct = round(100 * done / total) if total else 0
 
+    skin_tones = {"White": "#F3D8C2", "Tanned": "#D9A468", "Brown": "#8D5B35"}
+
     cards = []
     for t in traits:
         t_done = sum(1 for v in t["variants"] if v["done"])
         t_total = len(t["variants"])
         tiles = []
         for v in t["variants"]:
-            label = f'{esc(v["gender"])} · {esc(v["skin"])}'
+            alt = f'{esc(v["gender"])} {esc(v["skin"])}'
             if v.get("image"):
-                art = (f'<div class="art"><img src="{image_data_uri(v["image"])}" '
-                       f'alt="{label}"></div>')
+                art = f'<div class="art"><img src="{image_data_uri(v["image"])}" alt="{alt}"></div>'
             else:
                 art = '<div class="art empty"><span>awaiting art</span></div>'
             cls = "tile done" if v["done"] else "tile"
             chip = ('<span class="chip ok">DONE</span>' if v["done"]
                     else '<span class="chip todo">NEEDED</span>')
+            tone = skin_tones.get(v["skin"], "#999999")
             tiles.append(
-                f'<div class="{cls}">{art}'
-                f'<div class="tile-foot"><span class="vlabel">{label}</span>{chip}</div>'
-                f'</div>')
+                f'<div class="{cls}">'
+                f'<div class="badges"><span class="badge gender">{esc(v["gender"])}</span>'
+                f'<span class="badge skin"><i style="background:{tone}"></i>{esc(v["skin"])}</span>'
+                f'{chip}</div>'
+                f'{art}</div>')
+        if t.get("reference"):
+            ref = (f'<figure class="ref"><figcaption>Reference</figcaption>'
+                   f'<img src="{image_data_uri(t["reference"])}" alt="{esc(t["name"])} reference">'
+                   f'</figure>')
+        else:
+            ref = ('<figure class="ref empty"><figcaption>Reference</figcaption>'
+                   '<div class="ref-slot"><span>no reference art yet</span></div></figure>')
         complete = ' complete' if t_done == t_total else ''
         cards.append(f'''
     <section class="card{complete}">
@@ -75,7 +86,10 @@ def render():
         </div>
         <span class="count">{t_done}<em>/</em>{t_total}</span>
       </header>
-      <div class="tiles">{"".join(tiles)}</div>
+      <div class="card-body">
+        {ref}
+        <div class="tiles">{"".join(tiles)}</div>
+      </div>
     </section>''')
 
     html = f'''<title>Trait Tracker</title>
@@ -149,25 +163,58 @@ def render():
   .count em {{ font-style: normal; color: var(--muted); padding: 0 2px; }}
   .card.complete .count {{ color: var(--ok); }}
 
+  .card-body {{ display: flex; gap: 18px; align-items: flex-start; }}
+  .ref {{ margin: 0; flex: 0 0 200px; display: flex; flex-direction: column; gap: 8px; }}
+  .ref figcaption {{
+    font: 700 10px/1 var(--mono); letter-spacing: .18em; text-transform: uppercase;
+    color: var(--amber);
+  }}
+  .ref img, .ref-slot {{
+    width: 100%; aspect-ratio: 1; border-radius: 10px; object-fit: cover;
+    background: var(--panel);
+    border: 1px solid color-mix(in srgb, var(--amber) 40%, var(--line));
+  }}
+  .ref.empty .ref-slot {{
+    border-style: dashed; display: flex; align-items: center; justify-content: center;
+  }}
+  .ref-slot span {{ font: 500 11px/1.4 var(--mono); color: var(--muted); text-align: center;
+    padding: 0 14px; }}
+
   .tiles {{
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    flex: 1; display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: 12px;
   }}
-  .tile {{ display: flex; flex-direction: column; gap: 8px; }}
+  .tile {{
+    display: flex; flex-direction: column; gap: 9px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 11px;
+    padding: 10px;
+  }}
+  .tile.done {{ border-color: color-mix(in srgb, var(--ok) 55%, var(--line)); }}
+  .badges {{ display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }}
+  .badge {{
+    font: 800 10px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase;
+    border-radius: 4px; padding: 5px 7px;
+  }}
+  .badge.gender {{ background: #2A3240; color: var(--text); }}
+  .badge.skin {{
+    background: #1C222C; color: var(--text);
+    display: inline-flex; align-items: center; gap: 5px;
+  }}
+  .badge.skin i {{
+    width: 10px; height: 10px; border-radius: 50%; display: inline-block;
+    border: 1px solid #00000055;
+  }}
   .art {{
-    aspect-ratio: 1; border-radius: 9px; overflow: hidden;
-    background: var(--panel); border: 1px solid var(--line);
+    aspect-ratio: 1; border-radius: 7px; overflow: hidden;
+    background: var(--card); border: 1px solid var(--line);
     display: flex; align-items: center; justify-content: center;
   }}
   .art img {{ width: 100%; height: 100%; object-fit: cover; display: block; }}
-  .art.empty {{ border: 1px dashed #33405240; border-color: #334052; }}
+  .art.empty {{ border: 1px dashed #334052; }}
   .art.empty span {{ font: 500 11px/1 var(--mono); color: var(--muted); letter-spacing: .06em; }}
-  .tile.done .art {{ border-color: color-mix(in srgb, var(--ok) 55%, var(--line)); }}
-  .tile-foot {{ display: flex; align-items: center; justify-content: space-between; gap: 8px; }}
-  .vlabel {{ font: 500 11px/1.2 var(--mono); color: var(--muted); }}
   .chip {{
     font: 800 9px/1 var(--mono); letter-spacing: .12em; border-radius: 3px;
-    padding: 4px 6px; flex: none;
+    padding: 4px 6px; flex: none; margin-left: auto;
   }}
   .chip.ok {{ background: var(--ok); color: var(--ink); }}
   .chip.todo {{ background: color-mix(in srgb, var(--todo) 18%, transparent); color: var(--todo); }}
@@ -179,6 +226,8 @@ def render():
   @media (max-width: 640px) {{
     .stats {{ grid-template-columns: repeat(2, 1fr); }}
     .stat.bar {{ grid-column: 1 / -1; }}
+    .card-body {{ flex-direction: column; }}
+    .ref {{ flex-basis: auto; width: 100%; max-width: 260px; }}
   }}
 </style>
 <div class="wrap">
