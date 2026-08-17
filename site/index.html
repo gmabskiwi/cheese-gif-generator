@@ -308,7 +308,21 @@
   function saveNow() {
     if (saving) { scheduleSave(); return; }
     if (overlayEmpty()) { setNet("live", "live · saved"); return; }
-    if (!storeUrl) { setNet("offline", "offline — changes kept on this device"); return; }
+    // No shared store yet? Make one now rather than stranding this change
+    // in a single browser where a cleared cache would lose it.
+    if (!storeUrl) {
+      saving = true;
+      setNet("saving", "setting up shared saving");
+      createStore().then(function () {
+        setNet("live", "live · saved");
+        render();
+      }).catch(function () {
+        setNet("offline", "saved here — retrying to share");
+        clearTimeout(retryTimer);
+        retryTimer = setTimeout(saveNow, 20000);
+      }).then(function () { saving = false; });
+      return;
+    }
     saving = true;
     setNet("saving", "saving");
     fetchJson(storeUrl).catch(function () { return remote; }).then(function (base) {
@@ -338,8 +352,11 @@
   }
 
   function poll() {
-    if (document.hidden || !storeUrl || saving) return;
+    if (document.hidden || saving) return;
+    // Unsaved work retries even before a store exists, so a failed setup
+    // keeps trying instead of leaving changes stuck in one browser.
     if (!overlayEmpty()) { saveNow(); return; }
+    if (!storeUrl) return;
     fetchJson(storeUrl).then(function (data) {
       if (data && data.traits && (data.rev || 0) !== (remote.rev || 0)) {
         remote = data; render();
@@ -616,11 +633,15 @@
       navigator.clipboard.writeText(link).then(done, function () { prompt("Team link:", link); });
     } else { prompt("Team link:", link); }
   });
-  enableBtn.addEventListener("click", function () {
-    enableBtn.disabled = true;
-    setNet("saving", "creating shared store");
-    var seed = { updated: new Date().toISOString().slice(0, 10), rev: 1, traits: merge(remote) };
-    fetch(CREATE_ENDPOINT, {
+  var creating = null;
+  function createStore() {
+    if (creating) return creating;
+    var seed = {
+      updated: new Date().toISOString().slice(0, 10),
+      rev: (remote.rev || 0) + 1,
+      traits: merge(remote)
+    };
+    creating = fetch(CREATE_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Accept": "application/json" },
       body: JSON.stringify(seed)
@@ -632,13 +653,25 @@
       overlay = { variants: {}, refs: {}, added: [] };
       persistOverlay();
       rememberStore(loc);
+      return loc;
+    }).catch(function (err) {
+      creating = null;          // let a later change try again
+      throw err;
+    });
+    return creating;
+  }
+
+  enableBtn.addEventListener("click", function () {
+    enableBtn.disabled = true;
+    setNet("saving", "setting up shared saving");
+    createStore().then(function () {
       setNet("live", "live · saved");
       render();
-      alert("Shared saving is on.\n\nSend your team the link from the “Copy team link” button — everyone who opens it sees the same tracker, and every change saves for all of you.");
+      alert("Shared saving is on.\n\nUse “Copy team link” and send that link to your team — everyone who opens it sees the same tracker, and every change saves for all of you.");
     }).catch(function () {
       enableBtn.disabled = false;
-      setNet("offline", "couldn't reach the store service");
-      alert("Couldn't set up shared saving — the storage service didn't respond.\nYour changes are still saved in this browser. Try again in a moment.");
+      setNet("offline", "storage service didn't respond");
+      alert("Couldn't reach the storage service just now.\nYour work is still here in this browser, and it will keep trying.");
     });
   });
 
@@ -660,8 +693,8 @@
     }).catch(function () {}).then(function () {
       render();
       setNet(storeUrl ? "offline" : "", msg);
-      if (storeUrl) { shareBtn.hidden = false; if (!overlayEmpty()) saveNow(); }
-      else { enableBtn.hidden = false; }
+      if (storeUrl) shareBtn.hidden = false; else enableBtn.hidden = false;
+      if (!overlayEmpty()) saveNow();   // resume any work left over from last time
     });
   }
 
@@ -673,7 +706,7 @@
     var known = storeFromHash();
     if (!known) { try { known = localStorage.getItem(STORE_KEY); } catch (e) {} }
     if (!known && cfg.store) known = cfg.store;
-    if (!known) return fallbackToSnapshot("saving on this device only");
+    if (!known) return fallbackToSnapshot("ready — first change starts sharing");
     return startWith(known).catch(function () {
       return fallbackToSnapshot("offline — retrying");
     });
