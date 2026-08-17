@@ -1,0 +1,39 @@
+name: Publish trait tracker
+on:
+  push:
+    branches: [master]
+    paths:
+      - "site/**"
+      - ".github/workflows/publish.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-pages
+  cancel-in-progress: false
+
+# Pages serves the gh-pages branch, so publishing is just mirroring site/
+# to that branch's root. Deploying this way needs only contents:write —
+# the Pages-enablement API is not available to this token.
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Mirror site/ to gh-pages
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          cp -r site "$RUNNER_TEMP/publish"
+          touch "$RUNNER_TEMP/publish/.nojekyll"
+          git checkout --orphan gh-pages-tmp
+          git rm -rf --cached . > /dev/null
+          find . -maxdepth 1 ! -name . ! -name .git -exec rm -rf {} +
+          cp -r "$RUNNER_TEMP/publish/." .
+          git add -A
+          git commit -m "Publish trait tracker (${GITHUB_SHA::7})"
+          git push --force origin gh-pages-tmp:gh-pages
