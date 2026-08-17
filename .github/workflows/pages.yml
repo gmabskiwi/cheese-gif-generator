@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
@@ -16,6 +16,10 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
+# The tracker's shared state lives in a keyless JSON store created by the
+# first browser that turns saving on — GitHub's runners are blocked from
+# those services, so nothing here touches it. This workflow only publishes
+# the static site.
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -25,100 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Picks the first keyless JSON store that survives a full round trip
-      # (create → PUT a ~300 KB payload → GET it back). Never fails the
-      # deploy: without a store the site still serves, read-only.
-      - name: Bootstrap shared state store (first run only)
-        continue-on-error: true
-        run: |
-          set +e
-          if [ -f site/config.json ]; then
-            echo "store already configured:"; cat site/config.json; exit 0
-          fi
-
-          python3 -c "
-          import json
-          s = json.load(open('site/state.json'))
-          s['_pad'] = 'x' * 300000
-          json.dump(s, open('/tmp/big.json','w'))
-          json.dump(s, open('/tmp/seed.json','w'))
-          " || exit 0
-
-          verify () {  # $1 = url ; PUT the big payload, read it back
-            code=$(curl -sS -m 30 -o /dev/null -w '%{http_code}' -X PUT \
-              -H 'Content-Type: application/json' --data-binary @/tmp/big.json "$1")
-            echo "    PUT  -> ${code:-none}"
-            [ "$code" = "200" ] || [ "$code" = "201" ] || [ "$code" = "204" ] || return 1
-            code=$(curl -sS -m 30 -o /tmp/rt.json -w '%{http_code}' "$1")
-            echo "    GET  -> ${code:-none} ($(wc -c < /tmp/rt.json) bytes)"
-            [ "$code" = "200" ] || return 1
-            python3 -c "
-          import json,sys
-          d=json.load(open('/tmp/rt.json'))
-          sys.exit(0 if d.get('_pad','').count('x')==300000 else 1)
-          " || return 1
-            org=$(curl -sS -m 20 -o /dev/null -D - -X OPTIONS \
-              -H 'Origin: https://gmabskiwi.github.io' \
-              -H 'Access-Control-Request-Method: PUT' \
-              -H 'Access-Control-Request-Headers: content-type' "$1" \
-              | tr -d '\r' | awk 'tolower($1)=="access-control-allow-origin:"{print $2}')
-            echo "    CORS -> ${org:-none}"
-            [ -n "$org" ] || return 1
-            return 0
-          }
-
-          store=""
-
-          echo "== candidate: jsonblob =="
-          loc=$(curl -sS -m 30 -D - -o /dev/null -X POST -H 'Content-Type: application/json' \
-            --data-binary @/tmp/seed.json https://jsonblob.com/api/jsonBlob \
-            | tr -d '\r' | awk 'tolower($1)=="location:"{print $2}')
-          echo "  created: ${loc:-none}"
-          if [ -n "$loc" ]; then
-            case "$loc" in http*) : ;; *) loc="https://jsonblob.com$loc" ;; esac
-            verify "$loc" && store="$loc"
-          fi
-
-          if [ -z "$store" ]; then
-            echo "== candidate: extendsclass =="
-            id=$(curl -sS -m 30 -X POST -H 'Content-Type: application/json' \
-              --data-binary @/tmp/seed.json https://json.extendsclass.com/bin \
-              | python3 -c "import json,sys; print(json.load(sys.stdin).get('id',''))" 2>/dev/null)
-            echo "  created: ${id:-none}"
-            if [ -n "$id" ]; then
-              url="https://json.extendsclass.com/bin/$id"
-              verify "$url" && store="$url"
-            fi
-          fi
-
-          if [ -z "$store" ]; then
-            echo "== candidate: kvdb.io =="
-            bucket=$(curl -sS -m 30 -X POST -d '' https://kvdb.io/ | tr -d '\r\n')
-            echo "  created: ${bucket:-none}"
-            case "$bucket" in
-              *[!A-Za-z0-9]*|"") echo "  unusable bucket id" ;;
-              *) url="https://kvdb.io/$bucket/state"; verify "$url" && store="$url" ;;
-            esac
-          fi
-
-          if [ -z "$store" ]; then
-            echo "::warning::no shared store reachable from CI — site deploys read-only"
-            exit 0
-          fi
-
-          echo "selected store: $store"
-          curl -sS -m 30 -o /dev/null -X PUT -H 'Content-Type: application/json' \
-            --data-binary @site/state.json "$store"
-          printf '{"store":"%s"}\n' "$store" > site/config.json
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add site/config.json
-          git commit -m "Bootstrap shared tracker state store"
-          git push
-
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:

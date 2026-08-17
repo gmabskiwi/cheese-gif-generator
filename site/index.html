@@ -197,10 +197,12 @@
   <p class="eyebrow">NFT Collection · Art Progress</p>
   <h1>Trait Tracker</h1>
   <p class="sub">Tap <strong>sent</strong> when the art goes out, <strong>uploaded</strong> when
-  it's in the collection. Every change saves automatically for everyone.</p>
+  it's in the collection. Changes save by themselves — no save button, nothing to send round.</p>
 
   <div class="toolbar">
     <button class="btn" id="addBtn" type="button">+ Add trait</button>
+    <button class="btn ghost" id="enableBtn" type="button" hidden>Turn on shared saving</button>
+    <button class="btn ghost" id="shareBtn" type="button" hidden>Copy team link</button>
     <span class="net" id="net"><i></i><span id="netText">loading</span></span>
   </div>
 
@@ -226,7 +228,8 @@
   <div class="stats" id="stats"></div>
   <div id="cards"></div>
 
-  <footer>Saves automatically for everyone at this link · state backed up to GitHub twice a week.</footer>
+  <footer>Saves by itself for everyone holding the team link · other people's
+  changes appear here within about 15 seconds.</footer>
 </div>
 
 <script>
@@ -567,25 +570,115 @@
     else finish();
   });
 
-  // ---- boot: config → live store → fall back to the repo snapshot
+  // ---- shared store discovery
+  // The store's address travels in the page URL (#s=…) so a plain static
+  // host needs no backend and no build step: whoever opens the team link
+  // reads and writes the same shared state. It is also remembered per
+  // browser, so the bare URL keeps working after the first visit.
+  var STORE_KEY = "trait-tracker-store-v1";
+  var CREATE_ENDPOINT = "https://jsonblob.com/api/jsonBlob";  // config.json may override
+  var enableBtn = document.getElementById("enableBtn");
+  var shareBtn = document.getElementById("shareBtn");
+
+  function okStore(u) {
+    // https anywhere; plain http only against a local dev server
+    return /^https:\/\//.test(u) || /^http:\/\/(localhost|127\.0\.0\.1)[:\/]/.test(u);
+  }
+  function storeFromHash() {
+    var m = /[#&]s=([^&]+)/.exec(location.hash || "");
+    if (!m) return null;
+    try {
+      var u = decodeURIComponent(m[1]);
+      return okStore(u) ? u : null;
+    } catch (e) { return null; }
+  }
+  function rememberStore(url) {
+    storeUrl = url;
+    try { localStorage.setItem(STORE_KEY, url); } catch (e) {}
+    if (storeFromHash() !== url) {
+      location.hash = "s=" + encodeURIComponent(url);
+    }
+    enableBtn.hidden = true;
+    shareBtn.hidden = false;
+  }
+  function teamLink() {
+    return location.origin + location.pathname +
+      (storeUrl ? "#s=" + encodeURIComponent(storeUrl) : "");
+  }
+  shareBtn.addEventListener("click", function () {
+    var link = teamLink();
+    var done = function () {
+      var was = shareBtn.textContent;
+      shareBtn.textContent = "link copied ✓";
+      setTimeout(function () { shareBtn.textContent = was; }, 2000);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(link).then(done, function () { prompt("Team link:", link); });
+    } else { prompt("Team link:", link); }
+  });
+  enableBtn.addEventListener("click", function () {
+    enableBtn.disabled = true;
+    setNet("saving", "creating shared store");
+    var seed = { updated: new Date().toISOString().slice(0, 10), rev: 1, traits: merge(remote) };
+    fetch(CREATE_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify(seed)
+    }).then(function (r) {
+      var loc = r.headers.get("Location") || r.headers.get("location");
+      if (!r.ok || !loc) throw new Error("create failed " + r.status);
+      loc = new URL(loc, CREATE_ENDPOINT).href;   // Location may be relative
+      remote = seed;
+      overlay = { variants: {}, refs: {}, added: [] };
+      persistOverlay();
+      rememberStore(loc);
+      setNet("live", "live · saved");
+      render();
+      alert("Shared saving is on.\n\nSend your team the link from the “Copy team link” button — everyone who opens it sees the same tracker, and every change saves for all of you.");
+    }).catch(function () {
+      enableBtn.disabled = false;
+      setNet("offline", "couldn't reach the store service");
+      alert("Couldn't set up shared saving — the storage service didn't respond.\nYour changes are still saved in this browser. Try again in a moment.");
+    });
+  });
+
+  // ---- boot: hash → this browser's memory → config.json → repo snapshot
   setNet("", "loading");
-  fetchJson("config.json").then(function (cfg) {
-    if (!cfg || !cfg.store) throw new Error("no store");
-    storeUrl = cfg.store;
-    return fetchJson(storeUrl);
-  }).then(function (data) {
-    if (data && data.traits) remote = data;
-    render();
-    if (overlayEmpty()) setNet("live", "live · saved"); else saveNow();
-  }).catch(function () {
-    fetchJson("state.json").then(function (data) {
+
+  function startWith(url) {
+    storeUrl = url;
+    return fetchJson(url).then(function (data) {
+      if (data && data.traits) remote = data;
+      rememberStore(url);
+      render();
+      if (overlayEmpty()) setNet("live", "live · saved"); else saveNow();
+    });
+  }
+  function fallbackToSnapshot(msg) {
+    return fetchJson("state.json").then(function (data) {
       if (data && data.traits) remote = data;
     }).catch(function () {}).then(function () {
       render();
-      setNet("offline", storeUrl ? "offline — retrying" : "offline — changes kept on this device");
-      if (!overlayEmpty()) saveNow();
+      setNet(storeUrl ? "offline" : "", msg);
+      if (storeUrl) { shareBtn.hidden = false; if (!overlayEmpty()) saveNow(); }
+      else { enableBtn.hidden = false; }
+    });
+  }
+
+  // config.json is optional: it can point at a preset store and/or override
+  // which service new stores are created on.
+  fetchJson("config.json").catch(function () { return {}; }).then(function (cfg) {
+    cfg = cfg || {};
+    if (cfg.create) CREATE_ENDPOINT = cfg.create;
+    var known = storeFromHash();
+    if (!known) { try { known = localStorage.getItem(STORE_KEY); } catch (e) {} }
+    if (!known && cfg.store) known = cfg.store;
+    if (!known) return fallbackToSnapshot("saving on this device only");
+    return startWith(known).catch(function () {
+      return fallbackToSnapshot("offline — retrying");
     });
   });
+
   setInterval(poll, 15000);
   document.addEventListener("visibilitychange", function () { if (!document.hidden) poll(); });
 })();
