@@ -1,0 +1,14 @@
+{
+  "updated": "2026-08-17",
+  "traits": [
+    {
+      "category": "Left Arm",
+      "name": "Tiger Claw",
+      "variants": [
+        { "gender": "Female", "skin": "White", "done": false, "image": null },
+        { "gender": "Female", "skin": "Tanned", "done": false, "image": null },
+        { "gender": "Female", "skin": "Brown", "done": false, "image": null }
+      ]
+    }
+  ]
+}
