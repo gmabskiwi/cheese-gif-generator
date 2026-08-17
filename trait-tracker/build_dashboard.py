@@ -302,14 +302,16 @@ HTML_TEMPLATE = r'''<title>Trait Tracker</title>
   Claude and this page updates at the same link for everyone.</footer>
 </div>
 
-<dialog id="fallback">
-  <h3 style="margin:0 0 10px">Copy your update</h3>
-  <p style="color:var(--muted);font-size:13px;margin:0 0 12px">Download didn't start —
-  copy this and paste it in chat with Claude instead.</p>
-  <textarea id="fallbackText" readonly></textarea>
-  <div style="display:flex;gap:10px;margin-top:12px">
-    <button class="btn" id="copyBtn" type="button">Copy</button>
+<dialog id="syncDlg">
+  <h3 style="margin:0 0 10px">Sync your changes</h3>
+  <p style="color:var(--muted);font-size:13px;margin:0 0 12px">Copy this update and
+  paste it in chat with Claude — the page then refreshes at this same link
+  for everyone.</p>
+  <textarea id="syncText" readonly></textarea>
+  <div style="display:flex;gap:10px;margin-top:12px;align-items:center">
+    <button class="btn" id="copyBtn" type="button">Copy update</button>
     <button class="btn ghost" id="closeDlg" type="button">Close</button>
+    <span id="copiedNote" style="display:none;color:var(--ok);font:700 11px/1 var(--mono)">copied ✓</span>
   </div>
 </dialog>
 
@@ -588,32 +590,48 @@ HTML_TEMPLATE = r'''<title>Trait Tracker</title>
     else finish();
   });
 
-  // ---- sync: export merged state for Claude to bake in
-  var fallbackDlg = document.getElementById("fallback");
-  document.getElementById("closeDlg").addEventListener("click", function () { fallbackDlg.close(); });
+  // ---- sync: export merged state as copyable JSON for Claude to bake in.
+  // Unchanged baked images are exported as null (ingest_update.py keeps the
+  // previous file) so the payload stays small enough to paste in chat.
+  var syncDlg = document.getElementById("syncDlg");
+  var copiedNote = document.getElementById("copiedNote");
+  document.getElementById("closeDlg").addEventListener("click", function () { syncDlg.close(); });
   document.getElementById("copyBtn").addEventListener("click", function () {
-    var ta = document.getElementById("fallbackText");
+    var ta = document.getElementById("syncText");
     ta.select();
-    try { navigator.clipboard.writeText(ta.value); } catch (e) { document.execCommand("copy"); }
+    var shown = function () { copiedNote.style.display = "inline"; };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(ta.value).then(shown, function () {
+          if (document.execCommand("copy")) shown();
+        });
+      } else if (document.execCommand("copy")) shown();
+    } catch (e) { try { if (document.execCommand("copy")) shown(); } catch (e2) {} }
   });
   function updatePayload() {
+    var bakedRefs = {}, bakedImgs = {};
+    BAKED.traits.forEach(function (t) {
+      bakedRefs[tid(t)] = t.reference;
+      t.variants.forEach(function (v) { bakedImgs[tid(t) + "|" + (v.gender + "|" + v.skin).toLowerCase()] = v.image; });
+    });
+    var traits = merged().map(function (t) {
+      return {
+        category: t.category, name: t.name,
+        reference: t.reference === bakedRefs[tid(t)] ? null : t.reference,
+        variants: t.variants.map(function (v) {
+          var k = tid(t) + "|" + (v.gender + "|" + v.skin).toLowerCase();
+          return { gender: v.gender, skin: v.skin, sent: v.sent, uploaded: v.uploaded,
+                   image: v.image === bakedImgs[k] ? null : v.image };
+        })
+      };
+    });
     return JSON.stringify({ kind: "trait-tracker-update",
-      exported: new Date().toISOString().slice(0, 10), traits: merged() });
+      exported: new Date().toISOString().slice(0, 10), traits: traits });
   }
   document.getElementById("syncBtn").addEventListener("click", function () {
-    var payload = updatePayload();
-    var claude = window.claude;
-    var useP = claude && claude.use ? claude.use("downloads") : Promise.resolve(null);
-    Promise.resolve(useP).then(function (dl) {
-      if (!dl) throw { code: "unavailable" };
-      return dl.save({ filename: "trait-tracker-update.json", data: payload });
-    }).then(function () {
-      // saved — leave the unsynced dot on until Claude bakes it in
-    }).catch(function (err) {
-      if (err && (err.code === "declined" || err.code === "rate_limited")) return;
-      document.getElementById("fallbackText").value = payload;
-      fallbackDlg.showModal();
-    });
+    copiedNote.style.display = "none";
+    document.getElementById("syncText").value = updatePayload();
+    syncDlg.showModal();
   });
 
   render();

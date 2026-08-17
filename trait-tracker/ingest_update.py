@@ -54,10 +54,11 @@ def main():
     traits = []
     for t in update["traits"]:
         prev = old.get((t["category"].lower(), t["name"].lower()), {})
+        prev_imgs = {(v["gender"].lower(), v["skin"].lower()): v.get("image")
+                     for v in prev.get("variants", [])}
+        # the export nulls out anything unchanged; null means "keep what's on disk"
         ref = t.get("reference")
         if ref and ref.startswith("data:"):
-            # keep the existing file if one is already on disk and the page
-            # just echoed it back; only new uploads need materializing
             ref = materialize(ref, slug(t["category"], t["name"]) + "-reference.png")
         elif not ref:
             ref = prev.get("reference")
@@ -66,6 +67,8 @@ def main():
             img = v.get("image")
             if img and img.startswith("data:"):
                 img = materialize(img, slug(t["category"], t["name"], v["gender"], v["skin"]) + ".png")
+            elif not img:
+                img = prev_imgs.get((v["gender"].lower(), v["skin"].lower()))
             variants.append({"gender": v["gender"], "skin": v["skin"],
                              "sent": bool(v.get("sent")), "uploaded": bool(v.get("uploaded")),
                              "image": img})
