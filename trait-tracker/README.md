@@ -1,35 +1,43 @@
 # NFT Trait Tracker
 
-One spreadsheet (`NFT_Trait_Tracker.xlsx`) tracks every image the collection
-needs: one row per trait, six versions across (male & female × white, tanned,
-brown skin).
+Live dashboard at [claude.ai/code/artifact/a7204712-723c-4707-b244-5b1f781fff45](https://claude.ai/code/artifact/a7204712-723c-4707-b244-5b1f781fff45)
 
-## Adding work
+## System
 
-Drop the new traits in chat with Claude in any loose format, e.g.
+`traits.json` is the canonical state file. It tracks every image the collection needs with a two-step workflow:
+1. **Sent** — artist marks when they send the image
+2. **Uploaded** — team checks off when the image is received and verified
 
-> left arm: rolex, snake tattoo — right arm: pinky ring
+Each trait has variants across gender (male/female) and skin tone (white/tanned/brown).
 
-Claude appends them to the canonical file and sends the updated sheet back.
-The same append can be run by hand:
+## Adding traits
+
+Drop new traits in chat with Claude, or use the script directly:
 
 ```
 python add_traits.py "Left Arm: Rolex, Snake Tattoo" "Right Arm: Pinky Ring"
 ```
 
-Appending never touches pasted art, checkmarks, or formatting — it only fills
-the next empty pre-formatted rows.
+This appends rows to `NFT_Trait_Tracker.xlsx` without touching existing data.
 
-## Checking work off
+## Dashboard workflow
 
-In the sheet itself: paste the art onto its slot (normal paste, then drag it
-over the cell) and pick ✓ in the small box beside it. The slot turns green,
-the trait's DONE counter climbs, and the header stats update.
+**Artists**: When you finish an image variant, mark it "sent" on the dashboard.
 
-**If the sheet has been edited since Claude last saw it, attach the current
-copy when dropping new traits** so the additions land in the live version,
-not a stale one.
+**Team**: When you receive and verify an uploaded image, mark it "uploaded" to turn it green.
 
-`build_tracker.py` regenerates a blank tracker from scratch (styling,
-formulas, empty rows) — only for starting over, since a rebuild has no
-knowledge of pasted art.
+The dashboard regenerates from `traits.json` — to update it after marking work, run:
+
+```
+python build_dashboard.py
+```
+
+This embeds reference images and trait thumbnails as data URIs and publishes to the live link.
+
+## Files
+
+- `traits.json` — canonical state (variants with sent/uploaded flags)
+- `NFT_Trait_Tracker.xlsx` — optional spreadsheet for detailed tracking
+- `build_dashboard.py` — renders dashboard.html from traits.json
+- `add_traits.py` — appends new traits to both files
+- `build_tracker.py` — regenerates blank spreadsheet (start-over only)

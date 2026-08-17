@@ -258,8 +258,7 @@ def render():
     </div>
   </div>
 {"".join(cards)}
-  <footer>Updated {esc(state["updated"])} · to add traits or check work off, drop it in
-  chat with Claude — this page updates at the same link.</footer>
+  <footer>Updated {esc(state["updated"])} · Artists: mark "sent" when finished. Team: mark "uploaded" when received. Drop new traits in chat with Claude to sync.</footer>
 </div>
 '''
     with open(OUT, "w") as fh:
