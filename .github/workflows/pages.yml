@@ -1,0 +1,62 @@
+name: Deploy trait tracker
+on:
+  push:
+    branches: [master]
+    paths:
+      - "site/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bootstrap shared state store (first run only)
+        run: |
+          if [ -f site/config.json ]; then
+            echo "store already configured"
+            exit 0
+          fi
+          loc=$(curl -sf -D - -o /dev/null -X POST \
+            -H 'Content-Type: application/json' \
+            --data-binary @site/state.json \
+            https://jsonblob.com/api/jsonBlob | tr -d '\r' | awk 'tolower($1)=="location:"{print $2}')
+          if [ -z "$loc" ]; then
+            echo "::error::could not create the shared state store"
+            exit 1
+          fi
+          case "$loc" in
+            http*) : ;;
+            *) loc="https://jsonblob.com$loc" ;;
+          esac
+          printf '{"store":"%s"}\n' "$loc" > site/config.json
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add site/config.json
+          git commit -m "Bootstrap shared tracker state store"
+          git push
+
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
