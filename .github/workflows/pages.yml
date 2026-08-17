@@ -31,12 +31,24 @@ jobs:
             echo "store already configured"
             exit 0
           fi
-          loc=$(curl -sf -D - -o /dev/null -X POST \
+          echo "--- probe with minimal payload ---"
+          code=$(curl -sS -D /tmp/probe-h -o /tmp/probe-b -w '%{http_code}' -X POST \
+            -H 'Content-Type: application/json' -d '{"probe":1}' \
+            https://jsonblob.com/api/jsonBlob) || echo "probe curl exit: $?"
+          echo "probe status: ${code:-none}"
+          head -c 400 /tmp/probe-h 2>/dev/null || true
+          head -c 200 /tmp/probe-b 2>/dev/null || true
+          echo "--- create store with real state ---"
+          code=$(curl -sS -D /tmp/h -o /tmp/b -w '%{http_code}' -X POST \
             -H 'Content-Type: application/json' \
             --data-binary @site/state.json \
-            https://jsonblob.com/api/jsonBlob | tr -d '\r' | awk 'tolower($1)=="location:"{print $2}')
+            https://jsonblob.com/api/jsonBlob) || echo "create curl exit: $?"
+          echo "create status: ${code:-none}"
+          head -c 400 /tmp/h 2>/dev/null || true
+          head -c 200 /tmp/b 2>/dev/null || true
+          loc=$(tr -d '\r' < /tmp/h 2>/dev/null | awk 'tolower($1)=="location:"{print $2}')
           if [ -z "$loc" ]; then
-            echo "::error::could not create the shared state store"
+            echo "::error::could not create the shared state store (status ${code:-none})"
             exit 1
           fi
           case "$loc" in
